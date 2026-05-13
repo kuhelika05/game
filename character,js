@@ -1,0 +1,7 @@
+const skins = {
+    warrior: 0xff0000,
+    mage: 0x0000ff,
+    assassin: 0x00ff00
+};
+
+player.material.color.setHex(skins['mage']);
