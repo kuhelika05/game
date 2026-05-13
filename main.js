@@ -58,3 +58,18 @@ function animate() {
 }
 
 animate();
+const chatInput = document.getElementById('chatInput');
+const chatBox = document.getElementById('chatBox');
+
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        socket.emit('chatMessage', chatInput.value);
+        chatInput.value = '';
+    }
+});
+
+socket.on('chatMessage', (data) => {
+    const message = document.createElement('div');
+    message.innerText = data.message;
+    chatBox.appendChild(message);
+});
