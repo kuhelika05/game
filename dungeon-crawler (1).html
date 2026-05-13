@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dungeon Crawler — Online Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #f0d080;
+    --blood: #8b1a1a;
+    --dark: #0a0608;
+    --panel: rgba(10,6,8,0.88);
+    --border: rgba(201,168,76,0.4);
+    --text: #e8d5b0;
+    --muted: #8a7a60;
+  }
+
+  body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Crimson Text', serif;
+    color: var(--text);
+    user-select: none;
+  }
+
+  #canvas { display: block; width: 100vw; height: 100vh; }
+
+  /* HUD OVERLAY */
+  #hud {
+    position: fixed; inset: 0; pointer-events: none;
+    display: flex; flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* TOP BAR */
+  #topbar {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 16px 20px 0;
+  }
+
+  .player-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-width: 200px;
+    backdrop-filter: blur(6px);
+  }
+
+  .player-name {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+  }
+
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .bar-label { font-size: 11px; color: var(--muted); width: 20px; letter-spacing: 0.05em; }
+  .bar-track {
+    flex: 1; height: 8px; background: rgba(255,255,255,0.08);
+    border-radius: 4px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+  .hp-fill { background: linear-gradient(90deg, #7a1818, #c0392b); }
+  .mp-fill { background: linear-gradient(90deg, #1a3a7a, #2980b9); }
+  .xp-fill { background: linear-gradient(90deg, #7a5a10, var(--gold)); }
+  .bar-val { font-size: 10px; color: var(--muted); width: 52px; text-align: right; }
+
+  /* MINIMAP */
+  #minimap-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    backdrop-filter: blur(6px);
+  }
+  #minimap-label {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  #minimap { display: block; border-radius: 4px; }
+
+  /* ONLINE PANEL */
+  #online-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    min-width: 160px;
+    backdrop-filter: blur(6px);
+  }
+  .online-title {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .player-entry {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 5px; font-size: 12px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dot-green { background: #2ecc71; box-shadow: 0 0 4px #2ecc71; }
+  .dot-blue { background: #3498db; box-shadow: 0 0 4px #3498db; }
+  .dot-orange { background: #e67e22; box-shadow: 0 0 4px #e67e22; }
+  .pname { color: var(--text); }
+  .plevel { color: var(--muted); font-size: 10px; margin-left: auto; }
+
+  /* BOTTOM HUD */
+  #bottomhud {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 20px 16px;
+  }
+
+  /* CONTROLS */
+  #controls-hint {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    backdrop-filter: blur(6px);
+  }
+  .ctrl-title {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+  .ctrl-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .ctrl-item { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+  .kbd {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--gold-light);
+  }
+
+  /* ABILITY BAR */
+  #ability-bar {
+    display: flex; gap: 6px; align-items: flex-end;
+  }
+  .ability {
+    width: 52px; height: 52px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(6px);
+    position: relative;
+    cursor: pointer;
+    pointer-events: all;
+    transition: border-color 0.2s;
+  }
+  .ability:hover { border-color: var(--gold); }
+  .ability-icon { font-size: 20px; line-height: 1; }
+  .ability-key {
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .ability-cd {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.6);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    color: var(--gold);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .ability.on-cd .ability-cd { opacity: 1; }
+
+  /* CHAT */
+  #chat-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    width: 280px;
+    backdrop-filter: blur(6px);
+    max-height: 120px;
+  }
+  .chat-msg { font-size: 12px; margin-bottom: 3px; line-height: 1.4; }
+  .chat-user { color: var(--gold); font-weight: 600; }
+  .chat-system { color: var(--muted); font-style: italic; }
+  .chat-enemy { color: #e74c3c; }
+
+  /* KILL FEED */
+  #killfeed {
+    position: fixed;
+    top: 120px; right: 20px;
+    display: flex; flex-direction: column; gap: 4px;
+    pointer-events: none;
+  }
+  .kf-entry {
+    background: rgba(0,0,0,0.7);
+    border-left: 2px solid var(--blood);
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 0 4px 4px 0;
+    animation: fadeSlide 3s forwards;
+  }
+  @keyframes fadeSlide {
+    0% { opacity: 0; transform: translateX(20px); }
+    10% { opacity: 1; transform: translateX(0); }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* CROSSHAIR */
+  #crosshair {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  #crosshair svg { opacity: 0.7; }
+
+  /* DAMAGE FLASH */
+  #dmg-flash {
+    position: fixed; inset: 0;
+    background: rgba(180,0,0,0);
+    pointer-events: none;
+    transition: background 0.1s;
+  }
+  #dmg-flash.flash { background: rgba(180,0,0,0.25); }
+
+  /* LEVEL UP */
+  #levelup {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -60%);
+    font-family: 'Cinzel', serif;
+    font-size: 32px;
+    color: var(--gold);
+    text-shadow: 0 0 30px var(--gold);
+    letter-spacing: 0.1em;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  /* TITLE SCREEN */
+  #title-screen {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at center, #1a0a0a 0%, #000 70%);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #title-screen h1 {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(32px, 6vw, 72px);
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 40px rgba(201,168,76,0.5);
+    margin-bottom: 8px;
+  }
+  #title-screen .sub {
+    font-family: 'Crimson Text', serif;
+    font-size: 18px;
+    color: var(--muted);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 60px;
+  }
+  .start-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    letter-spacing: 0.15em;
+    color: var(--dark);
+    background: linear-gradient(135deg, var(--gold), var(--gold-light));
+    border: none;
+    padding: 14px 48px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 16px;
+  }
+  .start-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,168,76,0.4); }
+  .server-info {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .server-info span { color: #2ecc71; }
+
+  /* POINTER LOCK MSG */
+  #pointer-msg {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50;
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #pointer-msg.show { opacity: 1; pointer-events: all; cursor: pointer; }
+
+  /* BOSS BAR */
+  #boss-bar {
+    position: fixed;
+    top: 80px; left: 50%; transform: translateX(-50%);
+    width: 400px;
+    background: var(--panel);
+    border: 1px solid #8b1a1a;
+    border-radius: 8px;
+    padding: 10px 16px;
+    backdrop-filter: blur(6px);
+    display: none;
+    pointer-events: none;
+  }
+  .boss-name {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    color: #e74c3c;
+    text-align: center;
+    margin-bottom: 6px;
+    letter-spacing: 0.1em;
+  }
+  .boss-track {
+    height: 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 6px; overflow: hidden;
+  }
+  .boss-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a0000, #c0392b);
+    border-radius: 6px;
+    transition: width 0.3s;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen">
+  <h1>DUNGEON REALM</h1>
+  <div class="sub">Online Multiplayer · Early Access</div>
+  <button class="start-btn" id="start-btn">ENTER THE DUNGEON</button>
+  <div class="server-info">Server: EU-West-1 &nbsp;|&nbsp; Players online: <span>247</span> &nbsp;|&nbsp; Ping: <span>32ms</span></div>
+</div>
+
+<!-- POINTER LOCK -->
+<div id="pointer-msg" id="pointer-msg">Click to resume</div>
+
+<!-- HUD -->
+<div id="hud">
+  <!-- TOP -->
+  <div id="topbar">
+    <!-- Player card -->
+    <div class="player-card">
+      <div class="player-name">⚔ SHADOWBLADE · LVL <span id="lvl-num">7</span></div>
+      <div class="bar-row">
+        <span class="bar-label">HP</span>
+        <div class="bar-track"><div class="bar-fill hp-fill" id="hp-bar" style="width:78%"></div></div>
+        <span class="bar-val" id="hp-val">156 / 200</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">MP</span>
+        <div class="bar-track"><div class="bar-fill mp-fill" id="mp-bar" style="width:60%"></div></div>
+        <span class="bar-val" id="mp-val">60 / 100</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">XP</span>
+        <div class="bar-track"><div class="bar-fill xp-fill" id="xp-bar" style="width:40%"></div></div>
+        <span class="bar-val" id="xp-val">400 / 1000</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-direction:column;align-items:flex-end">
+      <!-- Minimap -->
+      <div id="minimap-wrap">
+        <div id="minimap-label">DUNGEON MAP — FLOOR 3</div>
+        <canvas id="minimap" width="120" height="120"></canvas>
+      </div>
+    </div>
+
+    <!-- Online players -->
+    <div id="online-panel">
+      <div class="online-title">▶ ONLINE — ROOM 7</div>
+      <div class="player-entry"><div class="dot dot-green"></div><span class="pname">ShadowBlade</span><span class="plevel">Lv7</span></div>
+      <div class="player-entry"><div class="dot dot-blue"></div><span class="pname">IronMage</span><span class="plevel">Lv9</span></div>
+      <div class="player-entry"><div class="dot dot-orange"></div><span class="pname">CryptHunter</span><span class="plevel">Lv6</span></div>
+      <div class="player-entry"><div class="dot" style="background:#aaa"></div><span class="pname">GhostRogue</span><span class="plevel" style="color:#555">offline</span></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM -->
+  <div id="bottomhud">
+    <!-- Chat -->
+    <div id="chat-box">
+      <div class="chat-msg"><span class="chat-user">IronMage:</span> boss room ahead, careful</div>
+      <div class="chat-msg"><span class="chat-user">CryptHunter:</span> got potions ready</div>
+      <div class="chat-msg"><span class="chat-system">★ You entered Floor 3</span></div>
+      <div class="chat-msg"><span class="chat-enemy">Skeleton Lord</span><span class="chat-system"> has appeared!</span></div>
+    </div>
+
+    <!-- Ability bar -->
+    <div id="ability-bar">
+      <div class="ability" id="ab1">
+        <div class="ability-icon">⚔️</div>
+        <div class="ability-key">Q</div>
+        <div class="ability-cd" id="cd1"></div>
+      </div>
+      <div class="ability" id="ab2">
+        <div class="ability-icon">🔥</div>
+        <div class="ability-key">E</div>
+        <div class="ability-cd" id="cd2"></div>
+      </div>
+      <div class="ability" id="ab3">
+        <div class="ability-icon">🛡️</div>
+        <div class="ability-key">R</div>
+        <div class="ability-cd" id="cd3"></div>
+      </div>
+      <div class="ability" id="ab4">
+        <div class="ability-icon">💊</div>
+        <div class="ability-key">F</div>
+        <div class="ability-cd" id="cd4"></div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div id="controls-hint">
+      <div class="ctrl-title">CONTROLS</div>
+      <div class="ctrl-row">
+        <div class="ctrl-item"><span class="kbd">W A S D</span> Move</div>
+        <div class="ctrl-item"><span class="kbd">Mouse</span> Look</div>
+        <div class="ctrl-item"><span class="kbd">Click</span> Attack</div>
+        <div class="ctrl-item"><span class="kbd">Q E R F</span> Abilities</div>
+        <div class="ctrl-item"><span class="kbd">Space</span> Jump</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CROSSHAIR -->
+<div id="crosshair">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="4" stroke="#c9a84c" stroke-width="1"/>
+    <line x1="12" y1="2" x2="12" y2="8" stroke="#c9a84c" stroke-width="1"/>
+    <line x1="12" y1="16" x2="12" y2="22" stroke="#c9a84c" stroke-width="1"/>
+    <line x1="2" y1="12" x2="8" y2="12" stroke="#c9a84c" stroke-width="1"/>
+    <line x1="16" y1="12" x2="22" y2="12" stroke="#c9a84c" stroke-width="1"/>
+  </svg>
+</div>
+
+<!-- Damage flash -->
+<div id="dmg-flash"></div>
+
+<!-- Level up -->
+<div id="levelup">✦ LEVEL UP ✦</div>
+
+<!-- Boss bar -->
+<div id="boss-bar">
+  <div class="boss-name">💀 SKELETON LORD — FLOOR 3 BOSS</div>
+  <div class="boss-track"><div class="boss-fill" id="boss-fill" style="width:100%"></div></div>
+</div>
+
+<!-- Kill feed -->
+<div id="killfeed"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+//  DUNGEON REALM — Browser Demo
+// ═══════════════════════════════════════════════
+
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x050205);
+renderer.toneMapping = THREE.ReinhardToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0005, 0.08);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.7, 0);
+
+// ─── DUNGEON LAYOUT ───
+const TILE = 4;
+const layout = [
+  [1,1,1,1,1,1,1,1,1,1,1,1],
+  [1,0,0,0,0,1,0,0,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,1,0,0,0,1,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,1,0,0,0,0,0,1],
+  [1,1,0,0,0,0,0,0,0,1,1,1],
+  [1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,1,0,0,0,1,0,0,0,1],
+  [1,0,0,0,0,0,0,0,0,0,0,1],
+  [1,0,0,0,0,1,0,0,0,0,0,1],
+  [1,1,1,1,1,1,1,1,1,1,1,1],
+];
+const ROWS = layout.length, COLS = layout[0].length;
+
+// Materials
+const stoneMat = new THREE.MeshLambertMaterial({ color: 0x2a2030 });
+const floorMat = new THREE.MeshLambertMaterial({ color: 0x1a1520 });
+const ceilingMat = new THREE.MeshLambertMaterial({ color: 0x120e18 });
+
+// Build dungeon
+const wallGeo = new THREE.BoxGeometry(TILE, TILE*1.5, TILE);
+const floorGeo = new THREE.PlaneGeometry(TILE, TILE);
+
+layout.forEach((row, z) => {
+  row.forEach((cell, x) => {
+    const wx = (x - COLS/2) * TILE;
+    const wz = (z - ROWS/2) * TILE;
+    if (cell === 1) {
+      const wall = new THREE.Mesh(wallGeo, stoneMat);
+      wall.position.set(wx, TILE*0.75 - 1, wz);
+      wall.receiveShadow = true;
+      wall.castShadow = true;
+      wall.userData.isWall = true;
+      scene.add(wall);
+    }
+    // Floor tile
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI/2;
+    floor.position.set(wx, -1, wz);
+    floor.receiveShadow = true;
+    scene.add(floor);
+    // Ceiling
+    const ceil = new THREE.Mesh(floorGeo, ceilingMat);
+    ceil.rotation.x = Math.PI/2;
+    ceil.position.set(wx, TILE*1.5 - 1, wz);
+    scene.add(ceil);
+  });
+});
+
+// ─── TORCHES ───
+const torchPositions = [
+  [-6,1,-6],[6,1,-6],[-6,1,6],[6,1,6],
+  [0,1,-10],[0,1,10],[-14,1,0],[14,1,0],
+];
+const torches = [];
+torchPositions.forEach(([x,y,z]) => {
+  const light = new THREE.PointLight(0xff6620, 2.5, 8);
+  light.position.set(x, y, z);
+  scene.add(light);
+  torches.push(light);
+
+  const torchGeo = new THREE.CylinderGeometry(0.05, 0.08, 0.4, 6);
+  const torchMesh = new THREE.Mesh(torchGeo, new THREE.MeshLambertMaterial({ color: 0x5a3010 }));
+  torchMesh.position.set(x, y - 0.3, z);
+  scene.add(torchMesh);
+
+  const flameGeo = new THREE.SphereGeometry(0.12, 6, 6);
+  const flameMesh = new THREE.Mesh(flameGeo, new THREE.MeshBasicMaterial({ color: 0xff9900 }));
+  flameMesh.position.set(x, y + 0.1, z);
+  scene.add(flameMesh);
+  torches.push({ light, flame: flameMesh });
+});
+
+// Ambient
+const ambientLight = new THREE.AmbientLight(0x110820, 0.8);
+scene.add(ambientLight);
+
+// ─── ENEMIES ───
+const enemies = [];
+const enemyGeo = new THREE.BoxGeometry(0.7, 1.4, 0.4);
+const skeletonMat = new THREE.MeshLambertMaterial({ color: 0xccddcc });
+const orcMat = new THREE.MeshLambertMaterial({ color: 0x3a5a2a });
+const eyeGeo = new THREE.SphereGeometry(0.08, 6, 6);
+const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2200 });
+
+const spawnPoints = [
+  [-8,0,8],[8,0,8],[-8,0,-8],[8,0,-8],
+  [0,0,12],[-12,0,0],[4,0,-4],[-4,0,4],
+];
+
+spawnPoints.forEach((pos, i) => {
+  const isBoss = i === 0;
+  const mat = isBoss ? new THREE.MeshLambertMaterial({ color: 0x888899 }) : (i % 2 ? orcMat : skeletonMat);
+  const body = new THREE.Mesh(
+    isBoss ? new THREE.BoxGeometry(1.2, 2.2, 0.7) : enemyGeo,
+    mat
+  );
+  body.position.set(...pos);
+  body.position.y = isBoss ? 0.1 : -0.3;
+  body.castShadow = true;
+  scene.add(body);
+
+  // Eyes
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeL.position.set(-0.15, 0.4, 0.22);
+  eyeR.position.set(0.15, 0.4, 0.22);
+  body.add(eyeL); body.add(eyeR);
+
+  // Head
+  const headGeo = new THREE.BoxGeometry(isBoss ? 0.9 : 0.6, isBoss ? 0.85 : 0.6, isBoss ? 0.7 : 0.5);
+  const head = new THREE.Mesh(headGeo, mat);
+  head.position.y = isBoss ? 1.55 : 1.1;
+  body.add(head);
+
+  const enemy = {
+    mesh: body,
+    hp: isBoss ? 500 : (50 + i * 20),
+    maxHp: isBoss ? 500 : (50 + i * 20),
+    speed: isBoss ? 0.012 : (0.018 + Math.random() * 0.01),
+    isBoss,
+    alive: true,
+    attackTimer: Math.random() * 2,
+    state: 'patrol',
+    patrolTarget: new THREE.Vector3(pos[0] + (Math.random()-0.5)*8, pos[1], pos[2] + (Math.random()-0.5)*8),
+  };
+  enemies.push(enemy);
+});
+
+// Boss bar
+const bossEnemy = enemies[0];
+document.getElementById('boss-bar').style.display = 'block';
+
+// ─── COLLECTIBLES ───
+const collectibles = [];
+const gemGeo = new THREE.OctahedronGeometry(0.2, 0);
+const gemMat = new THREE.MeshLambertMaterial({ color: 0x00aaff, emissive: 0x003366 });
+const coinGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 8);
+const coinMat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x443300 });
+
+[[-4,0,2],[4,0,-2],[-2,0,-6],[6,0,4],[-6,0,6],[2,0,8]].forEach(pos => {
+  const isGem = Math.random() > 0.5;
+  const mesh = new THREE.Mesh(isGem ? gemGeo : coinGeo, isGem ? gemMat : coinMat);
+  mesh.position.set(...pos);
+  mesh.position.y = -0.5;
+  scene.add(mesh);
+  collectibles.push({ mesh, type: isGem ? 'gem' : 'coin', collected: false });
+});
+
+// ─── PLAYER STATE ───
+const player = {
+  hp: 156, maxHp: 200,
+  mp: 60, maxMp: 100,
+  xp: 400, xpNext: 1000,
+  level: 7,
+  velocity: new THREE.Vector3(),
+  onGround: true,
+  attacking: false,
+  attackCooldown: 0,
+};
+
+// ─── INPUT ───
+const keys = {};
+let yaw = 0, pitch = 0;
+let isLocked = false;
+
+document.addEventListener('keydown', e => { keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+document.addEventListener('mousemove', e => {
+  if (!isLocked) return;
+  yaw -= e.movementX * 0.002;
+  pitch -= e.movementY * 0.002;
+  pitch = Math.max(-Math.PI/3, Math.min(Math.PI/4, pitch));
+});
+
+// Pointer lock
+canvas.addEventListener('click', () => {
+  if (!gameStarted) return;
+  canvas.requestPointerLock();
+});
+document.addEventListener('pointerlockchange', () => {
+  isLocked = document.pointerLockElement === canvas;
+  const msg = document.getElementById('pointer-msg');
+  msg.classList.toggle('show', !isLocked);
+});
+
+// Abilities
+const cooldowns = { Q: 0, E: 0, R: 0, F: 0 };
+const cdTimes = { Q: 3, E: 8, R: 12, F: 20 };
+document.addEventListener('keydown', e => {
+  const map = { KeyQ:'Q', KeyE:'E', KeyR:'R', KeyF:'F', Space:'Space' };
+  const key = map[e.code];
+  if (key && key !== 'Space' && cooldowns[key] <= 0) {
+    useAbility(key);
+  }
+});
+
+function useAbility(key) {
+  cooldowns[key] = cdTimes[key];
+  if (key === 'Q') { doAttack(true); }
+  if (key === 'E') { fireball(); }
+  if (key === 'R') { shield(); }
+  if (key === 'F') { heal(); }
+}
+
+function fireball() {
+  addKillfeed('🔥 Fireball launched!');
+  // Damage nearest enemy
+  enemies.forEach(e => {
+    if (!e.alive) return;
+    const d = camera.position.distanceTo(e.mesh.position);
+    if (d < 10) { damageEnemy(e, 40 + Math.random()*20); }
+  });
+}
+function shield() {
+  addKillfeed('🛡 Shield activated!');
+  player.hp = Math.min(player.maxHp, player.hp + 30);
+  updateBars();
+}
+function heal() {
+  addKillfeed('💊 Healing potion used!');
+  player.hp = Math.min(player.maxHp, player.hp + 50);
+  player.mp = Math.min(player.maxMp, player.mp + 30);
+  updateBars();
+}
+
+// Attack
+document.addEventListener('mousedown', e => {
+  if (e.button === 0 && isLocked) doAttack(false);
+});
+
+function doAttack(isHeavy) {
+  if (player.attackCooldown > 0) return;
+  player.attackCooldown = isHeavy ? 1.5 : 0.6;
+  // Check enemies in range
+  enemies.forEach(e => {
+    if (!e.alive) return;
+    const d = camera.position.distanceTo(e.mesh.position);
+    if (d < 3.5) {
+      damageEnemy(e, isHeavy ? 35 + Math.random()*15 : 15 + Math.random()*10);
+    }
+  });
+}
+
+function damageEnemy(e, dmg) {
+  e.hp -= dmg;
+  // Flash enemy red
+  e.mesh.material = new THREE.MeshLambertMaterial({ color: 0xff3300 });
+  setTimeout(() => {
+    if (e.alive) e.mesh.material = e.isBoss
+      ? new THREE.MeshLambertMaterial({ color: 0x888899 })
+      : (enemies.indexOf(e) % 2 ? orcMat : skeletonMat);
+  }, 120);
+
+  if (e.hp <= 0 && e.alive) {
+    e.alive = false;
+    scene.remove(e.mesh);
+    const names = ['Skeleton', 'Orc Guard', 'Dark Archer', 'Bone Knight', 'Shadow Imp'];
+    if (e.isBoss) {
+      addKillfeed('💀 SKELETON LORD defeated!');
+      document.getElementById('boss-bar').style.display = 'none';
+    } else {
+      addKillfeed(`⚔ ${names[Math.floor(Math.random()*names.length)]} slain`);
+    }
+    gainXP(e.isBoss ? 300 : 50 + Math.random()*30);
+  }
+
+  // Update boss bar
+  if (e.isBoss) {
+    const pct = Math.max(0, e.hp / e.maxHp * 100);
+    document.getElementById('boss-fill').style.width = pct + '%';
+  }
+}
+
+// ─── XP / LEVELING ───
+function gainXP(amount) {
+  player.xp += amount;
+  if (player.xp >= player.xpNext) {
+    player.level++;
+    player.xp -= player.xpNext;
+    player.xpNext = Math.floor(player.xpNext * 1.4);
+    player.maxHp += 20;
+    player.hp = player.maxHp;
+    document.getElementById('lvl-num').textContent = player.level;
+    showLevelUp();
+  }
+  updateBars();
+}
+
+function showLevelUp() {
+  const el = document.getElementById('levelup');
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+// ─── HUD UPDATES ───
+function updateBars() {
+  document.getElementById('hp-bar').style.width = (player.hp/player.maxHp*100)+'%';
+  document.getElementById('hp-val').textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+  document.getElementById('mp-bar').style.width = (player.mp/player.maxMp*100)+'%';
+  document.getElementById('mp-val').textContent = `${Math.ceil(player.mp)} / ${player.maxMp}`;
+  document.getElementById('xp-bar').style.width = (player.xp/player.xpNext*100)+'%';
+  document.getElementById('xp-val').textContent = `${Math.ceil(player.xp)} / ${player.xpNext}`;
+}
+
+function damagePlayer(amount) {
+  player.hp = Math.max(0, player.hp - amount);
+  updateBars();
+  const flash = document.getElementById('dmg-flash');
+  flash.classList.add('flash');
+  setTimeout(() => flash.classList.remove('flash'), 150);
+}
+
+function addKillfeed(msg) {
+  const kf = document.getElementById('killfeed');
+  const el = document.createElement('div');
+  el.className = 'kf-entry';
+  el.textContent = msg;
+  kf.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ─── MINIMAP ───
+const mm = document.getElementById('minimap');
+const mmCtx = mm.getContext('2d');
+
+function drawMinimap() {
+  mmCtx.clearRect(0,0,120,120);
+  const cw = 120/COLS, ch = 120/ROWS;
+  layout.forEach((row,z) => row.forEach((cell,x) => {
+    mmCtx.fillStyle = cell === 1 ? '#2a1a3a' : '#1a1225';
+    mmCtx.fillRect(x*cw, z*ch, cw, ch);
+  }));
+
+  // Enemies
+  enemies.forEach(e => {
+    if (!e.alive) return;
+    const ex = (e.mesh.position.x / TILE + COLS/2) * cw;
+    const ez = (e.mesh.position.z / TILE + ROWS/2) * ch;
+    mmCtx.fillStyle = e.isBoss ? '#e74c3c' : '#cc4422';
+    mmCtx.beginPath();
+    mmCtx.arc(ex, ez, e.isBoss ? 3 : 1.5, 0, Math.PI*2);
+    mmCtx.fill();
+  });
+
+  // Player
+  const px = (camera.position.x / TILE + COLS/2) * cw;
+  const pz = (camera.position.z / TILE + ROWS/2) * ch;
+  mmCtx.fillStyle = '#c9a84c';
+  mmCtx.beginPath();
+  mmCtx.arc(px, pz, 3, 0, Math.PI*2);
+  mmCtx.fill();
+  // Direction indicator
+  mmCtx.strokeStyle = '#c9a84c';
+  mmCtx.lineWidth = 1;
+  mmCtx.beginPath();
+  mmCtx.moveTo(px, pz);
+  mmCtx.lineTo(px + Math.sin(yaw)*8, pz + Math.cos(yaw)*8);
+  mmCtx.stroke();
+}
+
+// ─── COLLISION ───
+function checkWallCollision(pos) {
+  const gridX = Math.round(pos.x / TILE + COLS/2);
+  const gridZ = Math.round(pos.z / TILE + ROWS/2);
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const gx = gridX + dx, gz = gridZ + dz;
+      if (gx < 0 || gz < 0 || gx >= COLS || gz >= ROWS) continue;
+      if (layout[gz] && layout[gz][gx] === 1) {
+        const wx = (gx - COLS/2) * TILE;
+        const wz = (gz - ROWS/2) * TILE;
+        const dx2 = pos.x - wx, dz2 = pos.z - wz;
+        const margin = TILE/2 + 0.5;
+        if (Math.abs(dx2) < margin && Math.abs(dz2) < margin) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ─── GAME LOOP ───
+let gameStarted = false;
+let lastTime = 0;
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('title-screen').style.display = 'none';
+  gameStarted = true;
+  canvas.requestPointerLock();
+  addKillfeed('⚔ Entered Dungeon Floor 3');
+  setTimeout(() => addKillfeed('💀 Skeleton Lord senses your presence...'), 2000);
+});
+
+// Cooldown display
+function updateCooldownUI() {
+  ['Q','E','R','F'].forEach((k,i) => {
+    const el = document.getElementById(`cd${i+1}`);
+    const parent = document.getElementById(`ab${i+1}`);
+    if (cooldowns[k] > 0) {
+      el.textContent = Math.ceil(cooldowns[k]);
+      parent.classList.add('on-cd');
+    } else {
+      parent.classList.remove('on-cd');
+    }
+  });
+}
+
+// Jump
+let jumpVel = 0;
+let camY = 1.7;
+
+function animate(time) {
+  requestAnimationFrame(animate);
+  if (!gameStarted) { renderer.render(scene, camera); return; }
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+
+  // ── Player movement ──
+  const moveDir = new THREE.Vector3();
+  if (keys['KeyW'] || keys['ArrowUp']) moveDir.z -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) moveDir.z += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) moveDir.x -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) moveDir.x += 1;
+
+  if (moveDir.length() > 0) {
+    moveDir.normalize();
+    moveDir.applyEuler(new THREE.Euler(0, yaw, 0));
+    const speed = 5;
+    const nx = camera.position.x + moveDir.x * speed * dt;
+    const nz = camera.position.z + moveDir.z * speed * dt;
+    if (!checkWallCollision(new THREE.Vector3(nx, 0, camera.position.z)))
+      camera.position.x = nx;
+    if (!checkWallCollision(new THREE.Vector3(camera.position.x, 0, nz)))
+      camera.position.z = nz;
+  }
+
+  // Jump
+  if (keys['Space'] && player.onGround) {
+    jumpVel = 5;
+    player.onGround = false;
+  }
+  if (!player.onGround) {
+    jumpVel -= 12 * dt;
+    camY += jumpVel * dt;
+    if (camY <= 1.7) { camY = 1.7; player.onGround = true; jumpVel = 0; }
+  }
+  camera.position.y = camY;
+
+  // Camera rotation
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
+
+  // ── Cooldowns ──
+  ['Q','E','R','F'].forEach(k => { if (cooldowns[k] > 0) cooldowns[k] -= dt; });
+  if (player.attackCooldown > 0) player.attackCooldown -= dt;
+  updateCooldownUI();
+
+  // MP regen
+  player.mp = Math.min(player.maxMp, player.mp + 2 * dt);
+  updateBars();
+
+  // ── Torches flicker ──
+  const t = time * 0.001;
+  torches.forEach((torch, i) => {
+    if (torch.light) {
+      torch.light.intensity = 2.5 + Math.sin(t * 5 + i) * 0.5 + Math.sin(t * 11 + i * 2) * 0.3;
+    }
+    if (torch.flame) {
+      torch.flame.scale.set(
+        1 + Math.sin(t*8+i)*0.15,
+        1 + Math.sin(t*6+i)*0.2,
+        1 + Math.sin(t*7+i)*0.15
+      );
+    }
+  });
+
+  // ── Collectibles spin ──
+  collectibles.forEach(c => {
+    if (c.collected) return;
+    c.mesh.rotation.y += dt * 2;
+    c.mesh.position.y = -0.5 + Math.sin(t * 2) * 0.1;
+    const dist = camera.position.distanceTo(c.mesh.position);
+    if (dist < 1.5) {
+      c.collected = true;
+      scene.remove(c.mesh);
+      gainXP(c.type === 'gem' ? 80 : 20);
+      addKillfeed(c.type === 'gem' ? '💎 Gem collected! +80 XP' : '🪙 Gold coin! +20 XP');
+    }
+  });
+
+  // ── Enemy AI ──
+  enemies.forEach(e => {
+    if (!e.alive) return;
+    const dist = camera.position.distanceTo(e.mesh.position);
+
+    if (dist < 12) {
+      // Chase
+      const dir = camera.position.clone().sub(e.mesh.position).normalize();
+      const nx = e.mesh.position.x + dir.x * e.speed * 60 * dt;
+      const nz = e.mesh.position.z + dir.z * e.speed * 60 * dt;
+      if (!checkWallCollision(new THREE.Vector3(nx, 0, nz))) {
+        e.mesh.position.x = nx;
+        e.mesh.position.z = nz;
+      }
+      e.mesh.lookAt(camera.position.x, e.mesh.position.y, camera.position.z);
+    }
+
+    // Attack player
+    e.attackTimer -= dt;
+    if (dist < 2.5 && e.attackTimer <= 0) {
+      e.attackTimer = e.isBoss ? 1.2 : 2;
+      damagePlayer(e.isBoss ? 25 : 8 + Math.random()*5);
+    }
+
+    // Eye glow pulse
+    const eyeColor = new THREE.Color(
+      1, Math.sin(t * 4 + enemies.indexOf(e)) * 0.2, 0
+    );
+    e.mesh.children.forEach(child => {
+      if (child.geometry && child.geometry.type === 'SphereGeometry' && child.geometry.parameters.radius < 0.1) {
+        child.material.color = eyeColor;
+      }
+    });
+  });
+
+  drawMinimap();
+  renderer.render(scene, camera);
+}
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Show click-to-resume immediately
+document.getElementById('pointer-msg').classList.add('show');
+
+animate(0);
+</script>
+</body>
+</html>
